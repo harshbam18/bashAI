@@ -1,6 +1,6 @@
-import os  # for interacting with the operating system
-import shlex  # for parsing command line arguments
-import subprocess  # for executing shell commands
+import os  
+import shlex  
+import subprocess 
 
 def run_shell():
     while True:
@@ -11,12 +11,10 @@ def run_shell():
                 continue
             args = shlex.split(user_input)
 
-            # Handle exit command
             if args[0] == "exit":
                 print("Exiting BashAI...")
                 break
 
-            # Handle cd command
             elif args[0] == "cd":
                 try:
                     os.chdir(args[1])
@@ -25,7 +23,6 @@ def run_shell():
                 except FileNotFoundError:
                     print(f"BashAI: cd: no such file in directory: {args[1]}")
 
-            # Run other commands
             else:
                 subprocess.run(args, shell=True)
 
