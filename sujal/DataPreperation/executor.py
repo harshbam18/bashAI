@@ -1,59 +1,36 @@
 import os
-import time
-import logging
+from pathlib import Path
 from dataIngest import load_documents, split_documents
 from dataPreprocess import chunk_embeddings
-from langchain_community.vectorstores import FAISS 
-from langchain_ollama import OllamaEmbeddings
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger(__name__)
+# Define input and output directories
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+EMBEDDING_DIR = Path(__file__).resolve().parent.parent / "embeddings"
 
-def get_pdf_files(directory):
-    return [
-        os.path.join(directory, f)
-        for f in os.listdir(directory)
-        if f.lower().endswith(".pdf")
-    ]
+def main():
+    all_documents = []
+    print(f"[INFO] Reading PDFs from: {DATA_DIR}")
+
+    # Loop over all PDF files in the data directory
+    for pdf_file in DATA_DIR.glob("*.pdf"):
+        print(f"[INFO] Loading: {pdf_file.name}")
+        docs = load_documents(str(pdf_file))
+        all_documents.extend(docs)
+
+    print(f"[INFO] Total documents loaded: {len(all_documents)}")
+
+    print(f"[INFO] Splitting documents...")
+    chunks = split_documents(all_documents, chunk_size=300, chunk_overlap=50)
+    print(f"[INFO] Total chunks created: {len(chunks)}")
+
+    print(f"[INFO] Saving FAISS vectorstore to: {EMBEDDING_DIR}")
+    EMBEDDING_DIR.mkdir(parents=True, exist_ok=True)
+    vectorstore = chunk_embeddings(chunks, save_dir=str(EMBEDDING_DIR))
+
+    if vectorstore:
+        print("[SUCCESS] Vectorstore saved successfully.")
+    else:
+        print("[FAILURE] Vectorstore creation failed.")
 
 if __name__ == "__main__":
-    start_time = time.time()
-    base_dir = os.path.dirname(__file__)
-    data_dir = os.path.abspath(os.path.join(base_dir, "../data"))
-    embeddings_dir = os.path.abspath(os.path.join(base_dir, "../../embeddings"))
-
-    os.makedirs(embeddings_dir, exist_ok=True)
-    pdf_files = get_pdf_files(data_dir)
-
-    if not pdf_files:
-        log.warning(f"No PDF files found in {data_dir}. Exiting.")
-        exit(0)
-
-    all_documents = []
-    for pdf_file in pdf_files:
-        try:
-            docs = load_documents(pdf_file)
-            all_documents.extend(docs)
-            log.info(f"Loaded {len(docs)} pages from {pdf_file}")
-        except Exception as e:
-            log.warning(f"Failed to load {pdf_file}: {e}")
-
-    if not all_documents:
-        log.warning("No valid documents were loaded. Exiting.")
-        exit(0)
-
-    chunks = split_documents(all_documents)
-    log.info(f"Split into {len(chunks)} chunks.")
-
-    index_path = os.path.join(embeddings_dir, "index.faiss")
-    if os.path.exists(index_path):
-        log.info("Loading existing FAISS index...")
-        embeddings = OllamaEmbeddings(model="llama2")
-        vectorstore = FAISS.load_local(embeddings_dir, embeddings, allow_dangerous_deserialization=True)
-    else:
-        vectorstore = chunk_embeddings(chunks, save_dir=embeddings_dir)
-        log.info("FAISS index created and saved.")
-
-    log.info(f"Processed {len(pdf_files)} PDFs, {len(all_documents)} documents, {len(chunks)} chunks.")
-    log.info(f"Total execution time: {time.time() - start_time:.2f} seconds")
+    main()

@@ -5,27 +5,13 @@ import shutil
 import threading
 import time
 import signal
+import re
 
 from history import command_history
-
 from chat import query_bash_ai
-
 
 aliases = {}
 background_jobs = []
-
-def expand_variables_and_aliases(tokens):
-    if not tokens:
-        return []
-
-    if tokens[0] in aliases:
-        alias_cmd = aliases[tokens[0]]
-        alias_tokens = alias_cmd.strip().split()
-        tokens = alias_tokens + tokens[1:]
-
-    tokens = [os.path.expandvars(token) for token in tokens]
-    return tokens
-
 
 # Signal Handlers
 def handle_sigint(signal_number, frame):
@@ -44,11 +30,9 @@ elif os.name == 'nt':
 def expand_variables_and_aliases(tokens):
     if not tokens:
         return []
-
     if tokens[0] in aliases:
         alias_expansion = aliases[tokens[0]].split()
         tokens = alias_expansion + tokens[1:]
-
     tokens = [os.path.expandvars(token) for token in tokens]
     return tokens
 
@@ -162,10 +146,44 @@ def run_command(cmd_tokens, input_bytes=None):
     elif cmd == "bashai":
         if len(cmd_tokens) < 2:
             return b"bashai: missing question\n"
+        
         question = " ".join(cmd_tokens[1:])
         result = query_bash_ai(question)
-        divider = ("=*=" * 18) + "BASHAI" + ("=*=" * 18)
-        return f"{divider}\nQuestion: {result['question']}\nAnswer: {result['explanation']}\nCode: {result['code']}\n{divider}\n".encode()
+
+        GREEN = "\033[92m"
+        RESET = "\033[0m"
+
+        divider = GREEN + ("=*=" * 18) + "BASHAI" + ("=*=" * 18) + RESET
+        print(f"{divider}\nQuestion: {result['question']}\nAnswer: {result['explanation']}\nCode:\n{result['code']}\n{divider}")
+
+        user_input = input(f"{GREEN}Do you want to run the above code? (y/n): {RESET}").strip().lower()
+        if user_input == 'y':
+            # Strip leading/trailing whitespaces
+            raw_code = result['code'].strip()
+
+            # Remove surrounding triple quotes
+            if (raw_code.startswith('"""') and raw_code.endswith('"""')) or \
+            (raw_code.startswith("'''") and raw_code.endswith("'''")):
+                cleaned_code = raw_code[3:-3].strip()
+
+            # Remove surrounding double quotes
+            elif raw_code.startswith('"') and raw_code.endswith('"'):
+                cleaned_code = raw_code[1:-1].strip()
+
+            # Remove surrounding single quotes
+            elif raw_code.startswith("'") and raw_code.endswith("'"):
+                cleaned_code = raw_code[1:-1].strip()
+
+            else:
+                cleaned_code = raw_code  # No surrounding quotes
+
+            # Tokenize the cleaned code
+            new_tokens = cleaned_code.split()
+            print(f"Executing code: {cleaned_code}")
+            return run_command(new_tokens)
+        else:
+            return b"Skipped execution of suggested code.\n"
+
 
 
     try:
@@ -180,7 +198,6 @@ def execute_command(tokens):
     if not tokens:
         return
 
-
     if tokens[0] == "jobs":
         if background_jobs:
             for job in background_jobs:
@@ -189,10 +206,12 @@ def execute_command(tokens):
         else:
             print("No background jobs.")
         return
+
     if tokens[0] == "history":
         for idx, cmd in enumerate(command_history, 1):
             print(f"{idx}: {cmd}")
         return
+
     if tokens[0] == "alias":
         if len(tokens) == 1:
             for name, val in aliases.items():
@@ -200,7 +219,6 @@ def execute_command(tokens):
         elif '=' in tokens[1]:
             name, val = tokens[1].split("=", 1)
             if len(tokens) > 2:
-            # support alias with spaces like alias h1='touch harsh1.txt'
                 val = " ".join([val] + tokens[2:])
             val = val.strip("'\"")
             aliases[name] = val
@@ -257,8 +275,7 @@ def execute_command(tokens):
                 segments = " ".join(tokens).split("|")
                 data = input_bytes
                 for seg in segments:
-                    cmd_tokens = seg.strip().split()
-                    cmd_tokens = expand_variables_and_aliases(cmd_tokens)
+                    cmd_tokens = expand_variables_and_aliases(seg.strip().split())
                     data = run_command(cmd_tokens, input_bytes=data)
             else:
                 data = run_command(tokens, input_bytes=input_bytes)
@@ -286,6 +303,5 @@ def execute_command(tokens):
             "status": "Running"
         })
         thread.start()
-        print(f"[{job_id}] Started in background: {' '.join(tokens)}")
     else:
         run_pipeline()

@@ -13,7 +13,11 @@ signal.signal(signal.SIGINT, signal.default_int_handler)
 def shell_loop():
     while True:
         try:
-            user_input = input("bashAI> ").strip()
+            GREEN = "\033[92m"
+            RESET = "\033[0m"
+
+            user_input = input(f"{GREEN}BashAI> {RESET}").strip()
+
             if not user_input:
                 continue
             command_history.append(user_input) 

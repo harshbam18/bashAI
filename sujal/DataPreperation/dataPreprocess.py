@@ -1,20 +1,14 @@
-from langchain_ollama import OllamaEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
+import dotenv
 
-embeddings = OllamaEmbeddings(model="llama2")
+# Load environment variables from .env file 
+dotenv.load_dotenv()
+
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
 
 def chunk_embeddings(chunks, save_dir="faiss_index"):
-    """
-    Generate embeddings for a list of document chunks and save them to FAISS.
-    
-    Args:
-        chunks (list): A list of document objects to be embedded.
-        save_dir (str): Directory to save the FAISS index.
-    
-    Returns:
-        FAISS: The FAISS vector store containing the embeddings.
-    """
     texts = [chunk.page_content for chunk in chunks]
     metadatas = [chunk.metadata for chunk in chunks]
 
