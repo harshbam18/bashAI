@@ -1,0 +1,5 @@
+{
+    "question": "\"how to create a file named Harsh2.py?\"",
+    "explanation": "To create a file named Harsh2.py, you can use the `touch` command followed by the file name. Run the command: `touch Harsh2.py`. This will create an empty file named Harsh2.py in the current directory.",
+    "code": "touch Harsh2.py"
+}
